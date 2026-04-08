@@ -1,0 +1,8 @@
+services:
+  anvil:
+    build: .
+    ports:
+      - "8545:8545"
+    env_file:
+      - ./.env
+    restart: unless-stopped
