@@ -113,6 +113,7 @@ body {
 .stat .value {
   font-size: 16px;
   font-weight: 600;
+  word-break: break-all;
 }
 
 .connection-dot {
@@ -370,6 +371,109 @@ button.preset:hover {
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 3px;
+}
+
+/* --- Advanced section --- */
+
+.advanced-section {
+  margin-top: 32px;
+}
+
+.advanced-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 10px 20px;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  border-radius: var(--radius);
+}
+
+.advanced-toggle:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.chevron {
+  display: inline-block;
+  transition: transform 0.2s;
+  font-size: 12px;
+}
+
+.chevron.open {
+  transform: rotate(90deg);
+}
+
+/* --- Tabs --- */
+
+.tab-row {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--text);
+  background: none;
+}
+
+.tab.active {
+  color: var(--accent-hover);
+  border-bottom-color: var(--accent);
+  background: none;
+}
+
+/* --- Code display --- */
+
+.code-display {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  word-break: break-all;
+  color: var(--text-dim);
+}
+
+.code-display.scrollable {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.code-display pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: inherit;
+}
+
+/* --- Node info grid --- */
+
+.node-info-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
 }
 
 /* --- Responsive --- */

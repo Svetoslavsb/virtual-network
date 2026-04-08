@@ -134,6 +134,113 @@ export async function setAutomine(enabled: boolean): Promise<void> {
   await rpc("evm_setAutomine", [enabled]);
 }
 
+// --- Advanced: State editing ---
+
+export async function setCode(address: string, code: string): Promise<void> {
+  await rpc("anvil_setCode", [address, code.startsWith("0x") ? code : "0x" + code]);
+}
+
+export async function setNonce(address: string, nonce: number): Promise<void> {
+  await rpc("anvil_setNonce", [address, "0x" + nonce.toString(16)]);
+}
+
+export async function getNonce(address: string): Promise<number> {
+  const hex = await rpc<string>("eth_getTransactionCount", [address, "latest"]);
+  return parseInt(hex, 16);
+}
+
+export async function setStorageAt(address: string, slot: string, value: string): Promise<void> {
+  const fmtSlot = slot.startsWith("0x") ? slot : "0x" + slot;
+  const fmtValue = value.startsWith("0x") ? value : "0x" + value;
+  await rpc("anvil_setStorageAt", [address, fmtSlot, fmtValue]);
+}
+
+export async function getStorageAt(address: string, slot: string): Promise<string> {
+  const fmtSlot = slot.startsWith("0x") ? slot : "0x" + slot;
+  return rpc<string>("eth_getStorageAt", [address, fmtSlot, "latest"]);
+}
+
+export async function getCode(address: string): Promise<string> {
+  return rpc<string>("eth_getCode", [address, "latest"]);
+}
+
+// --- Advanced: State dump/load ---
+
+export async function dumpState(): Promise<string> {
+  return rpc<string>("anvil_dumpState");
+}
+
+export async function loadState(data: string): Promise<void> {
+  await rpc("anvil_loadState", [data.startsWith("0x") ? data : "0x" + data]);
+}
+
+// --- Advanced: Node config ---
+
+export interface NodeInfo {
+  currentBlockNumber: string;
+  currentBlockTimestamp: string;
+  currentBlockHash: string;
+  hardFork: string;
+  transactionOrder: string;
+  environment: {
+    chainId: number;
+    gasLimit: string;
+    gasPrice: string;
+  };
+  forkConfig: {
+    forkUrl: string | null;
+    forkBlockNumber: number | null;
+    forkRetryBackoff: number | null;
+  };
+}
+
+export async function getNodeInfo(): Promise<NodeInfo> {
+  return rpc<NodeInfo>("anvil_nodeInfo");
+}
+
+export async function setIntervalMining(seconds: number): Promise<void> {
+  await rpc("evm_setIntervalMining", [seconds]);
+}
+
+export async function setNextBlockBaseFee(wei: bigint): Promise<void> {
+  await rpc("anvil_setNextBlockBaseFeePerGas", ["0x" + wei.toString(16)]);
+}
+
+export async function setAutoImpersonate(enabled: boolean): Promise<void> {
+  await rpc("anvil_autoImpersonateAccount", [enabled]);
+}
+
+export async function setCoinbase(address: string): Promise<void> {
+  await rpc("anvil_setCoinbase", [address]);
+}
+
+export async function setBlockTimestampInterval(seconds: number): Promise<void> {
+  await rpc("anvil_setBlockTimestampInterval", [seconds]);
+}
+
+export async function removeBlockTimestampInterval(): Promise<void> {
+  await rpc("anvil_removeBlockTimestampInterval");
+}
+
+export async function dropTransaction(txHash: string): Promise<void> {
+  await rpc("anvil_dropTransaction", [txHash]);
+}
+
+// --- Advanced: Txpool ---
+
+export interface TxpoolStatus {
+  pending: string;
+  queued: string;
+}
+
+export async function txpoolStatus(): Promise<TxpoolStatus> {
+  return rpc<TxpoolStatus>("txpool_status");
+}
+
+export async function txpoolContent(): Promise<Record<string, unknown>> {
+  return rpc<Record<string, unknown>>("txpool_content");
+}
+
 // --- Helpers ---
 
 export function formatEther(wei: bigint): string {

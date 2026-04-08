@@ -117,7 +117,7 @@ export default function AccountManager() {
           <ul className="impersonated-list">
             {impersonated.map((addr) => (
               <li key={addr}>
-                <span className="mono">{addr.slice(0, 20)}...</span>
+                <span className="mono">{addr}</span>
                 <button className="small danger" onClick={() => doStopImpersonating(addr)}>
                   Stop
                 </button>

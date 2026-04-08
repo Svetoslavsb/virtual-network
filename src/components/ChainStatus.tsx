@@ -67,7 +67,7 @@ export default function ChainStatus() {
         </div>
         <div className="stat">
           <span className="label">Block Hash</span>
-          <span className="value mono">{block ? block.hash.slice(0, 18) + "..." : "..."}</span>
+          <span className="value mono">{block ? block.hash : "..."}</span>
         </div>
         <div className="stat">
           <span className="label">Txns in Block</span>
