@@ -1,73 +1,96 @@
-# React + TypeScript + Vite
+# Virtual Testnet
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Admin dashboard for managing an Anvil virtual testnet. Fork any EVM chain, manipulate time, impersonate accounts, manage state, and deploy contracts — all from a browser UI.
 
-Currently, two official plugins are available:
+## Local Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### Prerequisites
 
-## React Compiler
+- Node.js 18+
+- pnpm
+- Docker
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Start the Anvil fork
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd virtual-testnet
+cp .env.example .env   # edit FORK_URL, CHAIN_ID, etc.
+docker compose up -d
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Start the dashboard
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev
 ```
+
+Open http://localhost:5173. The dashboard connects to Anvil at `http://localhost:8545`.
+
+## Deploy on Railway
+
+Railway runs both the Anvil node and the static dashboard as separate services from the same repo.
+
+### 1. Create a new project on Railway
+
+Link your GitHub repo.
+
+### 2. Add the Anvil service
+
+- Click **New Service** > **GitHub Repo** (same repo)
+- Set **Root Directory** to `virtual-testnet`
+- Railway auto-detects the Dockerfile
+- Add environment variables:
+  - `FORK_URL` — your RPC endpoint (e.g. `https://ethereum-rpc.publicnode.com`)
+  - `CHAIN_ID` — chain ID (e.g. `1`)
+  - `BLOCK_TIME` — `auto` or a number in seconds
+  - `PORT` — `8545`
+- Under **Networking**, expose port `8545` (Railway will assign a public URL like `anvil-xxx.up.railway.app`)
+
+### 3. Add the Dashboard service
+
+- Click **New Service** > **GitHub Repo** (same repo)
+- Set **Root Directory** to `/` (project root)
+- Set **Build Command** to `pnpm install && pnpm build`
+- Set **Start Command** to `npx serve dist -s -l 3000`
+- Under **Networking**, expose port `3000`
+
+### 4. Point the dashboard at the Anvil service
+
+The dashboard defaults to `http://localhost:8545`. On Railway, the Anvil service has a different URL. Set an environment variable on the dashboard service:
+
+- `VITE_RPC_URL` — the internal or public URL of the Anvil service (e.g. `https://anvil-xxx.up.railway.app`)
+
+Then update `src/lib/rpc.ts` to use it:
+
+```ts
+const RPC_URL = import.meta.env.VITE_RPC_URL || "http://localhost:8545";
+```
+
+This is already handled — just set the env var and redeploy.
+
+### 5. Done
+
+Railway auto-deploys on push to main. Two services:
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| `anvil` | 8545 | Forked EVM node |
+| `dashboard` | 3000 | Admin UI |
+
+## Features
+
+**Core**
+- Chain status (live polling)
+- Time manipulation (skip forward, set timestamp)
+- Block mining
+- Account management (balance, impersonation)
+- Snapshots (take / revert)
+- Fork management (reset, change RPC/block)
+- Contract deployment
+
+**Advanced**
+- Node config (interval mining, base fee, coinbase, auto-impersonate, timestamp interval, drop tx)
+- State editor (set code, nonce, storage at any address)
+- State dump / load (full chain export/import)
+- Transaction pool viewer

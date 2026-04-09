@@ -1,4 +1,4 @@
-const RPC_URL = "http://localhost:8545";
+const RPC_URL = import.meta.env.VITE_RPC_URL || "http://localhost:8545";
 
 let requestId = 0;
 
