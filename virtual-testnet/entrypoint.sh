@@ -24,8 +24,26 @@ HARDFORK=${HARDFORK:-""}
 # (5 retries / 45s timeout) because a failed fetch is fatal, not just slow.
 FORK_RETRIES=${FORK_RETRIES:-10}
 FORK_TIMEOUT=${FORK_TIMEOUT:-120000}   # ms
-FORK_RETRY_BACKOFF=${FORK_RETRY_BACKOFF:-2}  # seconds
+# Anvil reads the backoff in milliseconds: at 2 all ten retries of a 429 land
+# inside ~30ms, the same second the provider is refusing, so they never help.
+FORK_RETRY_BACKOFF=${FORK_RETRY_BACKOFF:-1000}  # ms
 NO_RATE_LIMIT=${NO_RATE_LIMIT:-true}
+
+# Every mined block keeps a full copy of the fork cache as its state: 500 in
+# memory and 3,600 more under /tmp, so a long-running fork that has cached a
+# lot climbs by GBs until the container is OOM-killed. Keep only the last N
+# blocks' states in memory and none on disk; calls against older blocks then
+# fail. Set to "off" to keep the full history.
+PRUNE_HISTORY=${PRUNE_HISTORY:-64}
+
+# Anvil also keeps every pre-fork block, receipt and log it relays from the
+# upstream, for good: an indexer backfilling through the fork grows it by GBs.
+# Past MAX_RSS_MB anvil is stopped cleanly (SIGTERM, so state is dumped) and
+# restarted, which drops that cache, instead of the container being
+# OOM-killed mid-block. The container counts ~1 GB more than anvil's RSS, so
+# keep this well under its memory limit (5 GB for an 8 GB container); 0 disables.
+MAX_RSS_MB=${MAX_RSS_MB:-5120}
+MEMORY_CHECK_INTERVAL=${MEMORY_CHECK_INTERVAL:-15}   # seconds
 
 # Crash survival. Defaults to /data so this works out of the box; mount a
 # persistent volume there so state also survives redeploys, not just crashes.
@@ -56,6 +74,7 @@ ANVIL=(anvil
 [ -n "$FORK_BLOCK" ] && ANVIL+=(--fork-block-number "$FORK_BLOCK")
 [ -n "$HARDFORK" ]   && ANVIL+=(--hardfork "$HARDFORK")
 [ "$NO_RATE_LIMIT" = "true" ] && ANVIL+=(--no-rate-limit)
+[ -n "$PRUNE_HISTORY" ] && [ "$PRUNE_HISTORY" != "off" ] && ANVIL+=(--prune-history "$PRUNE_HISTORY")
 
 if [ -n "$STATE_DIR" ] && mkdir -p "$STATE_DIR" 2>/dev/null && [ -w "$STATE_DIR" ]; then
     # --state is load-on-start + dump-on-exit. A panic aborts before the exit
@@ -159,6 +178,31 @@ configure_node() {
     fi
 }
 
+# Resident memory of a pid in MB: /proc on Linux (the image has no ps), ps elsewhere.
+rss_mb() {
+    local kb
+    if [ -r "/proc/$1/status" ]; then
+        kb=$(awk '/^VmRSS:/ {print $2}' "/proc/$1/status")
+    else
+        kb=$(ps -o rss= -p "$1" 2>/dev/null)
+    fi
+    [ -n "$kb" ] && echo $(( kb / 1024 ))
+}
+
+# Stop anvil cleanly once it outgrows MAX_RSS_MB; the supervise loop restarts it.
+watch_memory() {
+    local pid=$1 mb
+    while kill -0 "$pid" 2>/dev/null; do
+        sleep "$MEMORY_CHECK_INTERVAL"
+        mb=$(rss_mb "$pid") || continue
+        if [ "$mb" -gt "$MAX_RSS_MB" ]; then
+            log "anvil is at ${mb}MB, over MAX_RSS_MB=${MAX_RSS_MB}: restarting it to drop its upstream cache"
+            kill -TERM "$pid" 2>/dev/null
+            return
+        fi
+    done
+}
+
 # --- supervise --------------------------------------------------------------
 
 attempt=0
@@ -170,16 +214,22 @@ while :; do
 
     "${ANVIL[@]}" &
     child_pid=$!
+    watcher_pid=""
 
     if wait_ready; then
         configure_node
         log "Ready on port $PORT"
         delay=$RESTART_DELAY   # healthy boot resets the backoff
+        if [ "$MAX_RSS_MB" -gt 0 ] 2>/dev/null; then
+            watch_memory "$child_pid" &
+            watcher_pid=$!
+        fi
     fi
 
     wait "$child_pid"
     exit_code=$?
     child_pid=""
+    [ -n "$watcher_pid" ] && kill "$watcher_pid" 2>/dev/null
 
     [ "$shutting_down" -eq 1 ] && exit 0
 
